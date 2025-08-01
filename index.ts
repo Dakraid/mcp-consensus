@@ -254,8 +254,7 @@ Remember that you are part of a team working toward the same goal: finding the o
     const completion = await this.openai.chat.completions.create({
       model: advisor.model,
       messages,
-      temperature: 0.7,
-      max_completion_tokens: 2000
+      temperature: 0.7
     });
 
     return completion.choices[0]?.message?.content || 'No response received';

@@ -1,6 +1,6 @@
 {
   "name": "@dakraid/mcp-consensus",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "MCP server for advisor-based consensus mechanism",
   "license": "MIT",
   "author": "Dakraid",
