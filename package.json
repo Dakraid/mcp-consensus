@@ -1,10 +1,13 @@
 {
   "name": "@dakraid/mcp-consensus",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "MCP server for advisor-based consensus mechanism",
   "license": "MIT",
   "author": "Dakraid",
   "type": "module",
+  "bin": {
+    "mcp-consensus": "dist/index.js"
+  },
   "main": "dist/index.js",
   "repository": {
     "type": "git",
