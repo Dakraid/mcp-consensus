@@ -13,8 +13,6 @@ import OpenAI from 'openai';
 interface ConsensusData {
   problem: string;
   availableTools: string[];
-  maxRounds: number;
-  consensusThreshold: number;
 }
 
 interface AdvisorConfig {
@@ -46,6 +44,8 @@ class ConsensusServer {
   private openai: OpenAI;
   private discussionHistory: DiscussionRound[] = [];
   private readonly disableLogging: boolean;
+  private readonly maxRounds: number;
+  private readonly consensusThreshold: number;
   private readonly preConfiguredAdvisors: AdvisorConfig[];
 
   constructor() {
@@ -54,6 +54,16 @@ class ConsensusServer {
     const apiKey = process.env.OPENROUTER_API_KEY;
     if (!apiKey) {
       throw new Error('OPENROUTER_API_KEY environment variable is required');
+    }
+    
+    this.maxRounds = parseInt(process.env.CONSENSUS_MAX_ROUNDS || '5');
+    if (isNaN(this.maxRounds) || this.maxRounds < 1 || this.maxRounds > 10) {
+      throw new Error('CONSENSUS_MAX_ROUNDS must be a number between 1 and 10');
+    }
+    
+    this.consensusThreshold = parseFloat(process.env.CONSENSUS_THRESHOLD || '0.8');
+    if (isNaN(this.consensusThreshold) || this.consensusThreshold < 0 || this.consensusThreshold > 1) {
+      throw new Error('CONSENSUS_THRESHOLD must be a number between 0 and 1');
     }
     
     this.openai = new OpenAI({
@@ -223,19 +233,10 @@ Remember that you are part of a team working toward the same goal: finding the o
     if (!data.availableTools || !Array.isArray(data.availableTools)) {
       throw new Error('Invalid availableTools: must be an array');
     }
-    if (!data.maxRounds || typeof data.maxRounds !== 'number' || data.maxRounds < 1) {
-      throw new Error('Invalid maxRounds: must be a number >= 1');
-    }
-    if (!data.consensusThreshold || typeof data.consensusThreshold !== 'number' || 
-        data.consensusThreshold < 0 || data.consensusThreshold > 1) {
-      throw new Error('Invalid consensusThreshold: must be a number between 0 and 1');
-    }
 
     return {
       problem: data.problem,
-      availableTools: data.availableTools,
-      maxRounds: data.maxRounds,
-      consensusThreshold: data.consensusThreshold
+      availableTools: data.availableTools
     };
   }
 
@@ -348,11 +349,11 @@ Remember that you are part of a team working toward the same goal: finding the o
         console.error(chalk.gray('─'.repeat(50)));
         console.error(`Problem: ${validatedInput.problem}`);
         console.error(`Advisors: ${this.preConfiguredAdvisors.map(a => a.name).join(', ')}`);
-        console.error(`Max Rounds: ${validatedInput.maxRounds}`);
+        console.error(`Max Rounds: ${this.maxRounds}`);
         console.error(chalk.gray('─'.repeat(50)));
       }
 
-      while (round <= validatedInput.maxRounds && !finalConsensus) {
+      while (round <= this.maxRounds && !finalConsensus) {
         const responses: AdvisorResponse[] = [];
         const allToolRequests: ToolRequest[] = [];
 
@@ -377,7 +378,7 @@ Remember that you are part of a team working toward the same goal: finding the o
           allToolRequests.push(...toolRequests);
         }
 
-        const consensusResult = this.checkConsensus(responses, validatedInput.consensusThreshold);
+        const consensusResult = this.checkConsensus(responses, this.consensusThreshold);
         
         const discussionRound: DiscussionRound = {
           round,
@@ -527,8 +528,8 @@ Key features:
 Parameters explained:
 - problem: Detailed description of the problem or request to solve
 - availableTools: Array of tool names available to the LLM for research
-- maxRounds: Maximum number of discussion rounds (default: 5, max: 10)
-- consensusThreshold: Consensus agreement threshold (default: 0.8, range: 0.0-1.0)
+- maxRounds: Maximum number of discussion rounds (configured via CONSENSUS_MAX_ROUNDS env var)
+- consensusThreshold: Consensus agreement threshold (configured via CONSENSUS_THRESHOLD env var)
 
 Tool request format for advisors:
 TOOL_REQUEST: {"tool": "tool_name", "parameters": {"param": "value"}, "reason": "explanation of why this tool is needed"}
@@ -562,15 +563,13 @@ Example usage scenarios:
       },
       maxRounds: {
         type: "integer",
-        description: "Maximum number of discussion rounds",
-        default: 5,
+        description: "Maximum number of discussion rounds (configured via CONSENSUS_MAX_ROUNDS env var)",
         minimum: 1,
         maximum: 10
       },
       consensusThreshold: {
         type: "number",
-        description: "Agreement threshold for consensus (0.0-1.0)",
-        default: 0.8,
+        description: "Agreement threshold for consensus (configured via CONSENSUS_THRESHOLD env var)",
         minimum: 0.0,
         maximum: 1.0
       }

@@ -38,7 +38,9 @@ Add to your MCP client configuration:
         "@dakraid/mcp-consensus"
       ],
       "env": {
-        "OPENROUTER_API_KEY": ""
+        "OPENROUTER_API_KEY": "",
+        "CONSENSUS_MAX_ROUNDS": "5",
+        "CONSENSUS_THRESHOLD": "0.8"
       }
     }
   }
@@ -54,8 +56,6 @@ A multi-advisor consensus system that facilitates structured discussion and deba
 **Parameters:**
 - `problem` (required): Detailed description of the problem to solve
 - `availableTools` (required): Array of tool names available for research
-- `maxRounds` (optional): Maximum discussion rounds (default: 5, max: 10)
-- `consensusThreshold` (optional): Agreement threshold (default: 0.8, range: 0.0-1.0)
 
 **Example Usage:**
 
@@ -63,9 +63,7 @@ A multi-advisor consensus system that facilitates structured discussion and deba
 // Basic consensus
 {
   "problem": "Should we adopt a remote-first work policy for our tech company?",
-  "availableTools": ["web_search", "read_file"],
-  "maxRounds": 3,
-  "consensusThreshold": 0.8
+  "availableTools": ["web_search", "read_file"]
 }
 ```
 
@@ -133,6 +131,8 @@ npm run watch
 ### Environment Variables
 
 - `OPENROUTER_API_KEY`: Required API key for OpenRouter
+- `CONSENSUS_MAX_ROUNDS`: Maximum number of discussion rounds (default: 5, range: 1-10)
+- `CONSENSUS_THRESHOLD`: Agreement threshold for consensus detection (default: 0.8, range: 0.0-1.0)
 - `DISABLE_CONSENSUS_LOGGING`: Set to "true" to disable console logging (default: false)
 
 ### Customization
