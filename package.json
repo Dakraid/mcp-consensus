@@ -1,0 +1,45 @@
+{
+  "name": "@dakraid/mcp-consensus",
+  "version": "0.1.0",
+  "description": "MCP server for advisor-based consensus mechanism",
+  "license": "MIT",
+  "author": "Dakraid",
+  "type": "module",
+  "main": "dist/index.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/dakraid/mcp-consensus.git"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "consensus",
+    "advisor"
+  ],
+  "homepage": "https://github.com/dakraid/mcp-consensus#readme",
+  "bugs": {
+    "url": "https://github.com/dakraid/mcp-consensus/issues"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc && shx chmod +x dist/*.js",
+    "prepare": "npm run build",
+    "watch": "tsc --watch"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "0.5.0",
+    "chalk": "^5.4.1",
+    "yargs": "^18.0.0",
+    "openai": "^5.11.0"
+  },
+  "devDependencies": {
+    "@types/node": "22.9.0",
+    "@types/yargs": "^17.0.33",
+    "shx": "^0.4.0",
+    "typescript": "^5.9.2"
+  }
+}
