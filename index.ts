@@ -360,21 +360,47 @@ Remember that you are part of a team working toward the same goal: finding the o
           `PROBLEM TO SOLVE:\n${validatedInput.problem}\n\nAVAILABLE TOOLS:\n${validatedInput.availableTools.join(', ')}\n\nPlease provide your analysis and solution. If you need additional information, use the TOOL_REQUEST format.\n\nTOOL_REQUEST format example:\nTOOL_REQUEST: {"tool": "web_search", "parameters": {"query": "specific search query"}, "reason": "I need to research current information about this topic"}` :
           `PREVIOUS DISCUSSION CONTEXT:\n${currentContext}\n\nPlease review the previous discussion and provide your updated analysis. Consider other advisors' perspectives and work toward consensus. If you need additional information, use the TOOL_REQUEST format.`;
 
-        for (const advisor of this.preConfiguredAdvisors) {
-          if (!this.disableLogging) {
-            console.error(chalk.yellow(`\n💭 Querying ${advisor.name}...`));
+        if (!this.disableLogging) {
+          console.error(chalk.yellow(`\n💭 Querying all advisors in parallel...`));
+        }
+
+        const advisorResults = await Promise.allSettled(
+          this.preConfiguredAdvisors.map(async (advisor) => {
+            try {
+              const response = await this.queryAdvisor(advisor, initialPrompt);
+              const toolRequests = this.parseToolRequests(response);
+              return {
+                advisorId: advisor.id,
+                response,
+                toolRequests,
+              };
+            } catch (e) {
+              return {
+                advisorId: advisor.id,
+                response: `Error querying advisor: ${e instanceof Error ? e.message : String(e)}`,
+                toolRequests: [] as ToolRequest[],
+              };
+            }
+          })
+        );
+
+        for (const result of advisorResults) {
+          if (result.status === 'fulfilled') {
+            const r = result.value;
+            responses.push({
+              advisorId: r.advisorId,
+              response: r.response,
+              toolRequests: r.toolRequests.length > 0 ? r.toolRequests : undefined,
+            });
+            allToolRequests.push(...r.toolRequests);
+          } else {
+            // In case a promise is rejected without our try/catch (shouldn't happen), record an error response
+            const reason = result.reason;
+            responses.push({
+              advisorId: 'unknown',
+              response: `Advisor failed: ${reason instanceof Error ? reason.message : String(reason)}`,
+            });
           }
-
-          const response = await this.queryAdvisor(advisor, initialPrompt);
-          const toolRequests = this.parseToolRequests(response);
-
-          responses.push({
-            advisorId: advisor.id,
-            response,
-            toolRequests: toolRequests.length > 0 ? toolRequests : undefined
-          });
-
-          allToolRequests.push(...toolRequests);
         }
 
         const consensusResult = this.checkConsensus(responses, this.consensusThreshold);
@@ -420,11 +446,46 @@ Remember that you are part of a team working toward the same goal: finding the o
         round++;
       }
 
+      // Final summary round: ask all advisors to provide their own summary of the consensus or final position
+      const summaryPrompt = `FINAL SUMMARY REQUEST:\n${finalConsensus ? `Consensus Found:\n${finalConsensus}\n\n` : ''}Discussion Context:\n${this.generateDiscussionContext()}\n\nIn your own words, provide a concise summary of the consensus and key reasoning (max 8 sentences).`;
+
+      const summaryResults = await Promise.allSettled(
+        this.preConfiguredAdvisors.map(async (advisor) => {
+          try {
+            const summary = await this.queryAdvisor(advisor, summaryPrompt);
+            return { advisorId: advisor.id, summary };
+          } catch (e) {
+            return { advisorId: advisor.id, summary: `Error generating summary: ${e instanceof Error ? e.message : String(e)}` };
+          }
+        })
+      );
+
+      const summaryResponses: AdvisorResponse[] = [];
+      const finalSummaryVariations: Array<{ advisorId: string; summary: string }> = [];
+      for (const res of summaryResults) {
+        if (res.status === 'fulfilled') {
+          const { advisorId, summary } = res.value;
+          summaryResponses.push({ advisorId, response: summary });
+          finalSummaryVariations.push({ advisorId, summary });
+        } else {
+          finalSummaryVariations.push({ advisorId: 'unknown', summary: `Summary failed: ${res.reason instanceof Error ? res.reason.message : String(res.reason)}` });
+        }
+      }
+
+      // Record the final summary round in the discussion history
+      this.discussionHistory.push({
+        round: this.discussionHistory.length + 1,
+        responses: summaryResponses,
+        consensus: finalConsensus,
+      });
+
       const result = {
         status: finalConsensus ? 'consensus_reached' : 'max_rounds_reached',
         finalConsensus: finalConsensus || 'No consensus reached within the maximum number of rounds',
         totalRounds: this.discussionHistory.length,
-        discussionHistory: this.discussionHistory
+        discussionHistory: this.discussionHistory,
+        finalSummaryVariations,
+        requesterGuidance: 'If the consensus includes source code or requests a code artifact, please provide the full source code in your final answer (do not truncate).'
       };
 
       if (!this.disableLogging) {
@@ -491,6 +552,8 @@ Remember that you are part of a team working toward the same goal: finding the o
 const CONSENSUS_TOOL: Tool = {
   name: "consensus",
   description: `A multi-advisor consensus system that facilitates structured discussion and debate among general-purpose AI advisors to reach optimal solutions.
+
+Important instruction for the requesting model: If your request includes or references source code, provide the full source code without truncation (do not omit sections). If the consensus requests a code artifact, include the complete implementation.
 
 This tool uses a team of 5 general-purpose AI advisors (Alpha, Beta, Gamma, Delta, Epsilon) who are trained to:
 - Analyze any type of problem from multiple relevant perspectives
@@ -580,7 +643,7 @@ Example usage scenarios:
 const server = new Server(
   {
     name: "consensus-server",
-    version: "1.0.0",
+    version: "1.2.0",
   },
   {
     capabilities: {
